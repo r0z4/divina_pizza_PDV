@@ -1,0 +1,5 @@
+{
+  "name": "Divina Pizza e Pastéis",
+  "description": "Sistema de Ponto de Venda para Divina Pizza e Pastéis com catálogo, carrinho e impressão térmica.",
+  "requestFramePermissions": []
+}
