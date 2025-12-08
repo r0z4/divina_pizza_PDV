@@ -3,11 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Pizza Divina - PDV</title>
+    <title>Divina Pizza e Pastéis - PDV</title>
+    <link rel="icon" type="image/png" href="/logo.png" />
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
+        darkMode: 'class',
         theme: {
           extend: {
             colors: {
@@ -55,9 +57,15 @@
         ::-webkit-scrollbar-track {
             background: #f1f1f1; 
         }
+        .dark ::-webkit-scrollbar-track {
+            background: #1f2937; 
+        }
         ::-webkit-scrollbar-thumb {
             background: #ccc; 
             border-radius: 4px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #4b5563; 
         }
         ::-webkit-scrollbar-thumb:hover {
             background: #5c1918; 
@@ -70,6 +78,11 @@
             }
             body {
                 background: white;
+                color: black;
+            }
+            .dark body {
+                background: white;
+                color: black;
             }
         }
     </style>
@@ -86,7 +99,7 @@
 </script>
 <link rel="stylesheet" href="/index.css">
 </head>
-  <body class="bg-cream text-gray-800 font-sans antialiased">
+  <body class="bg-cream text-gray-800 font-sans antialiased dark:bg-gray-900 dark:text-gray-100 transition-colors duration-200">
     <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
 </body>
