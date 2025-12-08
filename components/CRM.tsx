@@ -1,6 +1,7 @@
+
 import React, { useMemo, useState, useEffect } from 'react';
 import { Order, Customer, PaymentMethod, Employee, ActiveShift, Product } from '../types';
-import { Download, Users, Calendar, DollarSign, ArrowLeft, Search, TrendingUp, CreditCard, Wallet, AlertCircle, FileSpreadsheet, ChevronLeft, ChevronRight, ArrowRight, Clock, Plus, Trash2, UserCheck, User, Bike, CheckCircle, Store, BarChart, ShoppingBag, Trophy, Banknote, Smartphone, Globe, Utensils, TrendingDown, Percent, UserPlus, MapPin, Pencil, X, Loader2, History, Pizza, Cookie, CupSoda, NotebookPen, Printer, Timer, Ban, PieChart, ChevronDown, ChevronUp, ShoppingCart, Info } from 'lucide-react';
+import { Download, Users, Calendar, DollarSign, ArrowLeft, Search, TrendingUp, CreditCard, Wallet, AlertCircle, FileSpreadsheet, ChevronLeft, ChevronRight, ArrowRight, Clock, Plus, Trash2, UserCheck, User, Bike, CheckCircle, Store, BarChart, ShoppingBag, Trophy, Banknote, Smartphone, Globe, Utensils, TrendingDown, Percent, UserPlus, MapPin, Pencil, X, Loader2, History, Pizza, Cookie, CupSoda, NotebookPen, Printer, Timer, Ban, PieChart, ChevronDown, ChevronUp, ShoppingCart, Info, RotateCcw } from 'lucide-react';
 import { addEmployee, deleteEmployee } from '../services/staffService';
 import { addCustomer, deleteCustomer, getCustomers, updateCustomer } from '../services/customerService';
 
@@ -1064,4 +1065,599 @@ export const CRM: React.FC<CRMProps> = ({ orders, employees, activeShift, onUpda
                             </div>
 
                             {/* Drivers Report */}
-                            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border
+                            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+                                <h3 className="font-bold text-lg mb-4 text-gray-700 dark:text-gray-200 flex items-center gap-2"><Bike size={20}/> Entregadores (Taxas)</h3>
+                                <div className="space-y-3">
+                                    {financeData.drivers.map((d) => (
+                                        <div key={d.name} className="flex justify-between items-center border-b border-gray-100 dark:border-gray-700 pb-2">
+                                            <div>
+                                                <span className="text-sm font-bold text-gray-600 dark:text-gray-300 block">{d.name}</span>
+                                                <span className="text-xs text-gray-400">{d.count} entregas</span>
+                                            </div>
+                                            <span className="font-mono font-bold text-gray-800 dark:text-gray-100">{formatCurrency(d.fees)}</span>
+                                        </div>
+                                    ))}
+                                    {financeData.drivers.length === 0 && <p className="text-gray-400 text-sm">Nenhuma entrega no período.</p>}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Fiado Debtors List (Finance Tab) */}
+                        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+                            <h3 className="font-bold text-lg mb-4 text-gray-700 dark:text-gray-200 flex items-center gap-2"><NotebookPen size={20}/> Contas em Aberto (Fiado) no Período</h3>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-sm">
+                                    <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 uppercase text-xs">
+                                        <tr>
+                                            <th className="p-3">Cliente</th>
+                                            <th className="p-3">Telefone</th>
+                                            <th className="p-3 text-right">Total Devido</th>
+                                            <th className="p-3 text-center">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                                        {financeData.debtors.map((debtor, idx) => (
+                                            <React.Fragment key={idx}>
+                                                <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer" onClick={() => setExpandedDebtor(expandedDebtor === debtor.phone ? null : debtor.phone)}>
+                                                    <td className="p-3 font-bold text-gray-700 dark:text-gray-200">{debtor.name}</td>
+                                                    <td className="p-3 text-gray-600 dark:text-gray-400">{debtor.phone}</td>
+                                                    <td className="p-3 text-right font-bold text-red-600 dark:text-red-400">{formatCurrency(debtor.total)}</td>
+                                                    <td className="p-3 text-center">
+                                                        <button className="text-gray-400 hover:text-wine dark:hover:text-gold">
+                                                            {expandedDebtor === debtor.phone ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                {expandedDebtor === debtor.phone && (
+                                                    <tr>
+                                                        <td colSpan={4} className="p-3 bg-gray-50 dark:bg-gray-900/50">
+                                                            <div className="text-xs space-y-1">
+                                                                <p className="font-bold mb-2 text-gray-500">Pedidos deste cliente neste período:</p>
+                                                                {debtor.orders.map(o => (
+                                                                    <div key={o.id} className="flex justify-between border-b border-gray-200 dark:border-gray-700 pb-1 mb-1 last:border-0">
+                                                                        <span>#{o.id} - {new Date(o.timestamp).toLocaleDateString()}</span>
+                                                                        <span>{formatCurrency(o.total)}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </React.Fragment>
+                                        ))}
+                                        {financeData.debtors.length === 0 && (
+                                            <tr><td colSpan={4} className="p-4 text-center text-gray-400">Nenhum registro de fiado neste período.</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* --- TAB: CLOSURE --- */}
+                {activeTab === 'CLOSURE' && (
+                    <div className="animate-fade-in space-y-6">
+                        {/* Date Selector */}
+                        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                            <h2 className="text-xl font-bold text-wine dark:text-gold flex items-center gap-2"><DollarSign /> Fechamento de Caixa</h2>
+                            <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
+                                <button onClick={() => handleDateChange(-1)} className="p-2 hover:bg-white dark:hover:bg-gray-600 rounded shadow-sm transition-all"><ChevronLeft size={16}/></button>
+                                <div className="flex flex-col items-center px-4 min-w-[120px]">
+                                    <span className="text-xs font-bold text-gray-400 uppercase">Data</span>
+                                    <span className="font-bold text-gray-800 dark:text-white">{new Date(selectedDate + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
+                                </div>
+                                <button onClick={() => handleDateChange(1)} className="p-2 hover:bg-white dark:hover:bg-gray-600 rounded shadow-sm transition-all"><ChevronRight size={16}/></button>
+                                <button onClick={handleSetToday} className="ml-2 text-xs font-bold text-blue-600 hover:underline">Hoje</button>
+                            </div>
+                        </div>
+
+                        {/* Top Cards */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div className="bg-green-600 text-white p-4 rounded-xl shadow-lg">
+                                <p className="text-xs opacity-80 uppercase font-bold">Total Vendido</p>
+                                <h3 className="text-3xl font-bold">{formatCurrency(closureData.totalSales)}</h3>
+                                <p className="text-xs mt-1">{closureData.count} pedidos realizados</p>
+                            </div>
+                            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border-l-4 border-red-500">
+                                <p className="text-xs text-gray-500 uppercase font-bold">Total Taxas (Motoboys)</p>
+                                <h3 className="text-2xl font-bold text-red-600">{formatCurrency(closureData.totalFees)}</h3>
+                            </div>
+                            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border-l-4 border-orange">
+                                <p className="text-xs text-gray-500 uppercase font-bold">Custo Operacional (Equipe)</p>
+                                <h3 className="text-2xl font-bold text-orange">{formatCurrency(closureData.staffCost)}</h3>
+                                <p className="text-[10px] text-gray-400">Baseado na escala do dia</p>
+                            </div>
+                            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border-l-4 border-blue-600">
+                                <p className="text-xs text-gray-500 uppercase font-bold">Resultado Líquido (Caixa)</p>
+                                <h3 className="text-2xl font-bold text-blue-600">{formatCurrency(closureData.netTotal)}</h3>
+                                <p className="text-[10px] text-gray-400">Vendas - Taxas - Equipe - Fiado</p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* Breakdown by Method */}
+                            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+                                <h3 className="font-bold text-lg mb-4 text-gray-700 dark:text-gray-200 flex items-center gap-2"><Wallet size={20}/> Detalhamento por Pagamento</h3>
+                                <div className="space-y-3">
+                                    {Object.entries(closureData.byMethod).map(([method, val]) => (
+                                        <div key={method} className="flex justify-between items-center border-b border-gray-100 dark:border-gray-700 pb-2">
+                                            <span className="text-sm font-bold text-gray-600 dark:text-gray-300">{getPaymentLabel(method as PaymentMethod)}</span>
+                                            <span className="font-mono font-bold text-gray-800 dark:text-gray-100">{formatCurrency(val as number)}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                             {/* Driver Payouts */}
+                             <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+                                <h3 className="font-bold text-lg mb-4 text-gray-700 dark:text-gray-200 flex items-center gap-2"><Bike size={20}/> Pagamento de Entregadores</h3>
+                                <div className="space-y-3">
+                                    {Object.entries(closureData.driverPayouts).map(([name, val]) => (
+                                        <div key={name} className="flex justify-between items-center border-b border-gray-100 dark:border-gray-700 pb-2">
+                                            <div>
+                                                <span className="text-sm font-bold text-gray-600 dark:text-gray-300 block">{name}</span>
+                                                <span className="text-xs text-gray-400">{closureData.driverDeliveriesCount[name]} entregas</span>
+                                            </div>
+                                            <span className="font-mono font-bold text-red-600 dark:text-red-400">{formatCurrency(val as number)}</span>
+                                        </div>
+                                    ))}
+                                    {Object.keys(closureData.driverPayouts).length === 0 && <p className="text-gray-400 text-sm">Nenhuma entrega registrada.</p>}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Top Products */}
+                        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+                             <h3 className="font-bold text-lg mb-4 text-gray-700 dark:text-gray-200 flex items-center gap-2"><Trophy size={20}/> Produtos Mais Vendidos</h3>
+                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                                 {closureData.topProducts.map((p, i) => (
+                                     <div key={i} className={`p-3 rounded-lg border flex items-center justify-between ${getCategoryColor(p.category)} bg-opacity-10 dark:bg-opacity-10`}>
+                                         <div className="flex items-center gap-2 overflow-hidden">
+                                             <div className="font-bold text-lg text-gray-400 opacity-50">#{i+1}</div>
+                                             <div className="truncate">
+                                                 <p className="font-bold text-sm truncate">{p.name}</p>
+                                                 <p className="text-[10px] opacity-70 flex items-center gap-1">{getProductIcon(p.category)} {p.category}</p>
+                                             </div>
+                                         </div>
+                                         <span className="font-bold text-lg">{p.count}</span>
+                                     </div>
+                                 ))}
+                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* --- TAB: ORDERS --- */}
+                {activeTab === 'ORDERS' && (
+                    <div className="animate-fade-in flex flex-col h-full">
+                         {/* Search Bar */}
+                         <div className="mb-4">
+                             <div className="relative">
+                                 <Search className="absolute left-3 top-3 text-gray-400 w-5 h-5" />
+                                 <input 
+                                     type="text" 
+                                     placeholder="Buscar por ID, Cliente, Telefone, Motoboy..." 
+                                     value={orderSearch}
+                                     onChange={(e) => setOrderSearch(e.target.value)}
+                                     className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-wine outline-none shadow-sm"
+                                 />
+                             </div>
+                         </div>
+
+                         {/* Orders List */}
+                         <div className="flex-1 overflow-y-auto bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+                             <table className="w-full text-left text-sm">
+                                 <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 uppercase text-xs sticky top-0 z-10">
+                                     <tr>
+                                         <th className="p-4">#ID</th>
+                                         <th className="p-4">Data/Hora</th>
+                                         <th className="p-4">Cliente</th>
+                                         <th className="p-4">Tipo</th>
+                                         <th className="p-4">Pagamento</th>
+                                         <th className="p-4">Total</th>
+                                         <th className="p-4">Status</th>
+                                         <th className="p-4 text-center">Ações</th>
+                                     </tr>
+                                 </thead>
+                                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                                     {filteredOrders.length === 0 ? (
+                                         <tr>
+                                             <td colSpan={8} className="p-8 text-center text-gray-400">Nenhum pedido encontrado.</td>
+                                         </tr>
+                                     ) : (
+                                         filteredOrders.map(order => (
+                                             <tr key={order.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                                 <td className="p-4 font-bold text-wine dark:text-gold">#{order.id}</td>
+                                                 <td className="p-4 text-gray-600 dark:text-gray-300">
+                                                     <div className="font-bold">{new Date(order.timestamp).toLocaleDateString()}</div>
+                                                     <div className="text-xs">{new Date(order.timestamp).toLocaleTimeString()}</div>
+                                                 </td>
+                                                 <td className="p-4">
+                                                     <div className="font-bold text-gray-800 dark:text-gray-200">{order.customer.name}</div>
+                                                     <div className="text-xs text-gray-500">{order.customer.phone}</div>
+                                                 </td>
+                                                 <td className="p-4">
+                                                     <span className={`px-2 py-1 rounded text-xs font-bold ${order.type === 'DELIVERY' ? 'bg-blue-50 text-blue-700' : 'bg-orange-50 text-orange-700'}`}>
+                                                         {order.type === 'DELIVERY' ? 'Entrega' : 'Retirada'}
+                                                     </span>
+                                                 </td>
+                                                 <td className="p-4 text-gray-600 dark:text-gray-300 flex items-center gap-2">
+                                                     {order.paymentMethod === 'FIADO' ? <NotebookPen size={14} className="text-red-500"/> : null}
+                                                     {getPaymentLabel(order.paymentMethod)}
+                                                 </td>
+                                                 <td className="p-4 font-mono font-bold text-gray-800 dark:text-gray-100">{formatCurrency(order.total)}</td>
+                                                 <td className="p-4">
+                                                     <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                                         order.status === 'COMPLETED' ? 'bg-green-100 text-green-700' :
+                                                         order.status === 'CANCELED' ? 'bg-red-100 text-red-700' :
+                                                         'bg-yellow-100 text-yellow-700'
+                                                     }`}>
+                                                         {order.status === 'CONFIRMED' ? 'Novo' : 
+                                                          order.status === 'KITCHEN' ? 'Cozinha' : 
+                                                          order.status === 'DELIVERY' ? 'Entrega' : 
+                                                          order.status === 'COMPLETED' ? 'Concluído' : 'Cancelado'}
+                                                     </span>
+                                                 </td>
+                                                 <td className="p-4 text-center flex justify-center gap-2">
+                                                     <button onClick={() => setSelectedOrder(order)} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-gray-500" title="Ver Detalhes">
+                                                         <Info size={18} />
+                                                     </button>
+                                                     <button 
+                                                         onClick={() => onRepeatOrder && onRepeatOrder(order)}
+                                                         className="p-2 hover:bg-green-100 dark:hover:bg-green-900/50 rounded-lg text-green-600 dark:text-green-400" 
+                                                         title="Repetir Pedido"
+                                                     >
+                                                         <RotateCcw size={18} />
+                                                     </button>
+                                                 </td>
+                                             </tr>
+                                         ))
+                                     )}
+                                 </tbody>
+                             </table>
+                         </div>
+                    </div>
+                )}
+
+                {/* --- TAB: STAFF --- */}
+                {activeTab === 'STAFF' && (
+                    <div className="animate-fade-in">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            
+                            {/* Shift Management */}
+                            <div className="lg:col-span-2 space-y-6">
+                                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+                                    <h3 className="font-bold text-lg mb-6 text-gray-700 dark:text-gray-200 flex items-center gap-2"><Clock /> Escala de Hoje</h3>
+                                    
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        {employees.map(emp => {
+                                            const shift = activeShift.find(s => s.employeeId === emp.id);
+                                            const isSelected = !!shift;
+                                            
+                                            return (
+                                                <div 
+                                                    key={emp.id}
+                                                    className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${isSelected ? 'border-green-500 bg-green-50 dark:bg-green-900/10' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 bg-white dark:bg-gray-800'}`}
+                                                    onClick={() => toggleShift(emp.id)}
+                                                >
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${emp.isDriver ? 'bg-orange/10 text-orange' : 'bg-blue-100 text-blue-600'}`}>
+                                                                {emp.isDriver ? <Bike size={20} /> : <User size={20} />}
+                                                            </div>
+                                                            <div>
+                                                                <h4 className="font-bold text-gray-800 dark:text-gray-100">{emp.name}</h4>
+                                                                <p className="text-xs text-gray-500 dark:text-gray-400">{emp.role}</p>
+                                                            </div>
+                                                        </div>
+                                                        {isSelected && <CheckCircle className="text-green-500" size={20} />}
+                                                    </div>
+
+                                                    {isSelected && !emp.isDriver && (
+                                                        <div className="mt-3 pt-3 border-t border-green-200 dark:border-green-800 flex gap-2" onClick={e => e.stopPropagation()}>
+                                                            <button 
+                                                                onClick={() => updatePeriods(emp.id, 1)}
+                                                                className={`flex-1 py-1 text-xs font-bold rounded ${shift.periods === 1 ? 'bg-green-600 text-white shadow' : 'bg-green-200 text-green-800 dark:bg-green-900/50 dark:text-green-300'}`}
+                                                            >
+                                                                Meio Período ({formatCurrency(emp.payPerPeriod)})
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => updatePeriods(emp.id, 2)}
+                                                                className={`flex-1 py-1 text-xs font-bold rounded ${shift.periods === 2 ? 'bg-green-600 text-white shadow' : 'bg-green-200 text-green-800 dark:bg-green-900/50 dark:text-green-300'}`}
+                                                            >
+                                                                Dia Completo ({formatCurrency(emp.payPerPeriod * 2)})
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )
+                                        })}
+                                        {employees.length === 0 && (
+                                            <p className="col-span-full text-center text-gray-400 py-4">Nenhum colaborador cadastrado.</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Add Employee Form & List Actions */}
+                            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 h-fit">
+                                <h3 className="font-bold text-lg mb-6 flex items-center gap-2 text-gray-700 dark:text-gray-200"><UserPlus /> Novo Colaborador</h3>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nome</label>
+                                        <input type="text" value={newEmpName} onChange={e => setNewEmpName(e.target.value)} className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="Ex: João Silva" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Função / Cargo</label>
+                                        <input type="text" value={newEmpRole} onChange={e => setNewEmpRole(e.target.value)} className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="Ex: Entregador, Pizzaiolo" />
+                                    </div>
+                                    <div className="flex items-center gap-2 py-2">
+                                        <input type="checkbox" id="isDriver" checked={newEmpIsDriver} onChange={e => setNewEmpIsDriver(e.target.checked)} className="w-4 h-4 accent-wine" />
+                                        <label htmlFor="isDriver" className="text-sm font-bold text-gray-700 dark:text-gray-300">É Entregador / Motoboy?</label>
+                                    </div>
+                                    {!newEmpIsDriver && (
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Valor p/ Período (R$)</label>
+                                            <input type="number" value={newEmpPay} onChange={e => setNewEmpPay(e.target.value)} className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="0.00" />
+                                        </div>
+                                    )}
+                                    <button onClick={handleAddEmployee} className="w-full bg-wine hover:bg-wine-light text-white font-bold py-3 rounded-lg shadow mt-2">
+                                        ADICIONAR
+                                    </button>
+                                </div>
+
+                                {/* Manage List (Delete) */}
+                                <div className="mt-8 pt-6 border-t border-gray-100 dark:border-gray-700">
+                                    <h4 className="font-bold text-gray-700 dark:text-gray-300 mb-4 text-sm uppercase">Gerenciar Lista</h4>
+                                    <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                                        {employees.map(emp => (
+                                            <div key={emp.id} className="flex justify-between items-center text-sm p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded group">
+                                                <span className="dark:text-gray-300">{emp.name}</span>
+                                                <button onClick={(e) => handleDeleteEmployee(e, emp.id)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">
+                                                    <Trash2 size={16}/>
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* --- TAB: CUSTOMERS --- */}
+                {activeTab === 'CUSTOMERS' && (
+                    <div className="animate-fade-in grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
+                        {/* List */}
+                        <div className="lg:col-span-2 flex flex-col h-[calc(100vh-200px)]">
+                            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 mb-4 flex gap-4">
+                                <div className="relative flex-1">
+                                    <Search className="absolute left-3 top-3 text-gray-400 w-5 h-5" />
+                                    <input 
+                                        type="text" 
+                                        placeholder="Buscar cliente por nome ou telefone..." 
+                                        value={customerSearch}
+                                        onChange={(e) => setCustomerSearch(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-white outline-none focus:ring-1 focus:ring-wine"
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div className="flex-1 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-y-auto">
+                                <table className="w-full text-left text-sm">
+                                    <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 uppercase text-xs sticky top-0">
+                                        <tr>
+                                            <th className="p-4">Nome</th>
+                                            <th className="p-4">Telefone</th>
+                                            <th className="p-4">Endereço</th>
+                                            <th className="p-4">Pedidos</th>
+                                            <th className="p-4 text-center">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                                        {filteredCustomers.map(cust => (
+                                            <React.Fragment key={cust.id}>
+                                                <tr className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer ${expandedCustomerId === cust.id ? 'bg-gray-50 dark:bg-gray-700/50' : ''}`} onClick={() => setExpandedCustomerId(expandedCustomerId === cust.id ? null : cust.id)}>
+                                                    <td className="p-4 font-bold text-gray-800 dark:text-gray-200">{cust.name}</td>
+                                                    <td className="p-4 text-gray-600 dark:text-gray-400">{cust.phone}</td>
+                                                    <td className="p-4 text-gray-600 dark:text-gray-400 truncate max-w-[200px]">{cust.address} - {cust.neighborhood}</td>
+                                                    <td className="p-4 font-bold text-blue-600 dark:text-blue-400">{cust.orderCount || 0}</td>
+                                                    <td className="p-4 flex justify-center gap-2" onClick={e => e.stopPropagation()}>
+                                                        <button 
+                                                            onClick={(e) => handleEditCustomer(e, cust)}
+                                                            className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded"
+                                                        >
+                                                            <Pencil size={16}/>
+                                                        </button>
+                                                        <button 
+                                                            onClick={(e) => handleDeleteCustomer(e, cust.id || '')}
+                                                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                                                        >
+                                                            <Trash2 size={16}/>
+                                                        </button>
+                                                        <button className="p-2 text-gray-400">
+                                                            {expandedCustomerId === cust.id ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                {/* Expanded History Row */}
+                                                {expandedCustomerId === cust.id && (
+                                                    <tr>
+                                                        <td colSpan={5} className="p-0 bg-gray-50 dark:bg-gray-900/50">
+                                                            <div className="p-4 border-b border-gray-200 dark:border-gray-700 animate-fade-in">
+                                                                <h4 className="text-xs font-bold text-gray-500 uppercase mb-3 flex items-center gap-2"><History size={14}/> Histórico de Pedidos Recentes</h4>
+                                                                <div className="space-y-2">
+                                                                    {getLastOrdersForCustomer(cust).map(o => (
+                                                                        <div key={o.id} className="flex items-center justify-between text-sm bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700">
+                                                                            <div className="flex gap-4">
+                                                                                <span className="font-bold text-wine dark:text-gold">#{o.id}</span>
+                                                                                <span className="text-gray-500">{new Date(o.timestamp).toLocaleDateString()}</span>
+                                                                                <span className="text-gray-600 dark:text-gray-300 flex items-center gap-1">
+                                                                                    {o.items.length} itens ({o.items.map(i => i.product.sabor).join(', ').slice(0, 30)}...)
+                                                                                </span>
+                                                                            </div>
+                                                                            <div className="flex gap-4 items-center">
+                                                                                <span className="font-bold">{formatCurrency(o.total)}</span>
+                                                                                <button 
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        onRepeatOrder && onRepeatOrder(o);
+                                                                                    }}
+                                                                                    className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-bold hover:bg-green-200"
+                                                                                >
+                                                                                    Repetir
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
+                                                                    {getLastOrdersForCustomer(cust).length === 0 && <p className="text-gray-400 text-sm italic">Nenhum pedido encontrado no histórico recente.</p>}
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </React.Fragment>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {/* Edit/Create Form */}
+                        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 h-fit">
+                            <h3 className="font-bold text-lg mb-6 flex items-center gap-2 text-gray-700 dark:text-gray-200">
+                                {editingCustomer ? <><Pencil className="text-blue-500"/> Editar Cliente</> : <><UserPlus className="text-green-500"/> Novo Cliente</>}
+                            </h3>
+                            
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nome Completo</label>
+                                    <input type="text" value={newCustName} onChange={e => setNewCustName(e.target.value)} className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Telefone (Whatsapp)</label>
+                                    <input type="text" value={newCustPhone} onChange={e => setNewCustPhone(e.target.value)} className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="(15) 99999-9999" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Bairro</label>
+                                    <input type="text" value={newCustNeighborhood} onChange={e => setNewCustNeighborhood(e.target.value)} className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Endereço Completo</label>
+                                    <textarea value={newCustAddress} onChange={e => setNewCustAddress(e.target.value)} className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white h-24 resize-none" />
+                                </div>
+                                
+                                <div className="flex gap-2 pt-2">
+                                    {editingCustomer && (
+                                        <button onClick={handleCancelEditCustomer} className="flex-1 bg-gray-200 text-gray-700 font-bold py-3 rounded-lg hover:bg-gray-300">
+                                            Cancelar
+                                        </button>
+                                    )}
+                                    <button onClick={handleSaveCustomer} disabled={isBusy} className="flex-1 bg-leaf hover:bg-green-700 text-white font-bold py-3 rounded-lg shadow flex justify-center items-center gap-2">
+                                        {isBusy ? <Loader2 className="animate-spin"/> : (editingCustomer ? 'ATUALIZAR' : 'SALVAR')}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+
+        {/* Global Action Modal (Confirmation) */}
+        {confirmModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 max-w-sm w-full border border-gray-200 dark:border-gray-700">
+                    <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-2">{confirmModal.title}</h3>
+                    <p className="text-gray-600 dark:text-gray-300 mb-6 text-sm">{confirmModal.message}</p>
+                    <div className="flex gap-3">
+                        <button 
+                            onClick={closeConfirmModal}
+                            disabled={isBusy}
+                            className="flex-1 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                        >
+                            Cancelar
+                        </button>
+                        <button 
+                            onClick={executePendingAction}
+                            disabled={isBusy}
+                            className="flex-1 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center"
+                        >
+                            {isBusy ? <Loader2 className="animate-spin" size={18} /> : 'Confirmar'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* Detail Modal (Shared with Kanban style) - Using Selected Order State */}
+        {selectedOrder && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] border border-gray-200 dark:border-gray-700">
+                    <div className={`p-4 flex justify-between items-center shrink-0 text-white ${selectedOrder.status === 'CANCELED' ? 'bg-red-600' : 'bg-wine'}`}>
+                        <div className="flex items-center gap-2">
+                             <h3 className="font-bold text-lg">Detalhes do Pedido #{selectedOrder.id}</h3>
+                             <span className="bg-white/20 px-2 py-0.5 rounded text-xs uppercase font-bold">{selectedOrder.status === 'CANCELED' ? 'CANCELADO' : selectedOrder.status}</span>
+                        </div>
+                        <button onClick={() => setSelectedOrder(null)}><X/></button>
+                    </div>
+                    
+                    <div className="p-6 overflow-y-auto bg-gray-50 dark:bg-gray-900 flex-1 space-y-4">
+                        {/* Just a simple view for CRM purposes */}
+                        <div className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                             <p><strong>Cliente:</strong> {selectedOrder.customer.name}</p>
+                             <p><strong>Telefone:</strong> {selectedOrder.customer.phone}</p>
+                             {selectedOrder.type === 'DELIVERY' && <p><strong>Endereço:</strong> {selectedOrder.customer.address} - {selectedOrder.customer.neighborhood}</p>}
+                             <p><strong>Entregador:</strong> {selectedOrder.driverName || '-'}</p>
+                             <p><strong>Operador:</strong> {selectedOrder.operatorName || '-'}</p>
+                             <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2">
+                                 <p className="font-bold mb-1">Itens:</p>
+                                 <ul className="list-disc pl-5">
+                                     {selectedOrder.items.map((i, idx) => (
+                                         <li key={idx}>{i.quantity}x {formatItemName(i.product, i.flavors)}</li>
+                                     ))}
+                                 </ul>
+                             </div>
+                             <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2 flex justify-between items-center">
+                                 <span className="font-bold">Total:</span>
+                                 <span className="text-xl font-bold text-wine dark:text-gold">{formatCurrency(selectedOrder.total)}</span>
+                             </div>
+                             <p className="text-xs text-gray-500">Pagamento: {getPaymentLabel(selectedOrder.paymentMethod)}</p>
+                        </div>
+                    </div>
+                    
+                    <div className="p-4 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
+                         <button 
+                             onClick={() => {
+                                 onRepeatOrder && onRepeatOrder(selectedOrder);
+                                 setSelectedOrder(null);
+                             }}
+                             className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-green-700"
+                         >
+                             <RotateCcw size={16}/> Repetir Pedido
+                         </button>
+                         <button onClick={() => setSelectedOrder(null)} className="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg font-bold">Fechar</button>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* Alert/Success Toast/Modal */}
+        {alertModal && (
+            <div className="fixed top-4 right-4 z-[100] bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded shadow-lg animate-fade-in flex items-center gap-2" role="alert">
+                <AlertCircle />
+                <span className="block sm:inline">{alertModal}</span>
+                <button onClick={() => setAlertModal(null)} className="ml-2 font-bold"><X size={16}/></button>
+            </div>
+        )}
+        {successMessage && (
+            <div className="fixed top-4 right-4 z-[100] bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded shadow-lg animate-fade-in flex items-center gap-2" role="alert">
+                <CheckCircle />
+                <span className="block sm:inline">{successMessage}</span>
+                <button onClick={() => setSuccessMessage(null)} className="ml-2 font-bold"><X size={16}/></button>
+            </div>
+        )}
+    </div>
+  );
+};
