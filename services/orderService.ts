@@ -33,8 +33,9 @@ const dispatchLocalUpdate = () => {
     window.dispatchEvent(new Event("local-orders-update"));
 };
 
-const dispatchConnectionError = () => {
-    window.dispatchEvent(new Event("firebase-connection-error"));
+const dispatchConnectionError = (message?: string) => {
+    const event = new CustomEvent("firebase-connection-error", { detail: { message } });
+    window.dispatchEvent(event);
 };
 
 // --- Helper to get raw local data for CSV Export ---
@@ -97,6 +98,25 @@ export const findCustomerHistory = async (phone: string): Promise<{ customer: Cu
     }
 };
 
+// --- Helper: Check specific 'Database Not Found' error ---
+const isDatabaseMissingError = (error: any) => {
+    const msg = error.message || '';
+    const code = error.code || '';
+    return (
+        code === 'not-found' || 
+        msg.includes('database') && msg.includes('does not exist') ||
+        msg.includes('project') && msg.includes('does not exist')
+    );
+};
+
+// --- Helper: Sanitize Data for Firestore (Removes Undefined) ---
+const sanitizeData = (data: any) => {
+    // A maneira mais segura e rápida de remover 'undefined' recursivamente é via JSON serialize/deserialize
+    // Isso garante que campos undefined sejam removidos do objeto, evitando o erro do Firestore.
+    // Campos 'null' são preservados, o que é aceitável pelo Firestore.
+    return JSON.parse(JSON.stringify(data));
+};
+
 // --- Real-time Listener ---
 export const subscribeToOrders = (callback: (orders: Order[]) => void) => {
     let unsubscribeFirebase = () => {};
@@ -131,24 +151,18 @@ export const subscribeToOrders = (callback: (orders: Order[]) => void) => {
             })) as Order[];
             callback(ordersData);
         }, (error) => {
-            // Check specific database missing error
-            if (error.message.includes("database") && error.message.includes("does not exist")) {
-                 console.error(`
-                 🚨 ERRO DE CONEXÃO COM BANCO DE DADOS:
-                 O Firebase retornou que o banco de dados '(default)' não foi encontrado.
-                 
-                 SE VOCÊ TEM CERTEZA QUE CRIOU O BANCO NO CONSOLE:
-                 1. O navegador pode estar com cache antigo. Vá em Configurações > Resetar App & Cache.
-                 2. Verifique se o ID do projeto 'pizza-divina-pdv' está correto.
-                 3. Verifique se o banco foi criado na localização correta.
-                 `);
+            // Enhanced Error Log
+            if (isDatabaseMissingError(error)) {
+                 console.group('%c 🚨 ERRO CRÍTICO DE CONFIGURAÇÃO (Firestore) ', 'background: red; color: white; padding: 4px; border-radius: 2px; font-size: 12px;');
+                 console.error('O Banco de Dados (default) não foi encontrado.');
+                 console.warn('CAUSA PROVÁVEL: O banco foi criado como "Datastore Mode" ou não foi criado.');
+                 console.warn('SOLUÇÃO: O SDK Web exige "Firestore Native Mode". Verifique o console do Firebase.');
+                 console.groupEnd();
+                 dispatchConnectionError("Banco de Dados não configurado corretamente (Modo Datastore detectado?). Operando Offline.");
             } else {
-                console.error("🔥 ERRO DE CONEXÃO FIREBASE (Subscribe):", error);
+                console.error("🔥 Erro de conexão Firebase (Subscribe):", error.code);
+                dispatchConnectionError();
             }
-            
-            console.warn("Alternando para Modo Offline automaticamente.");
-            
-            dispatchConnectionError(); // Notify App to switch UI state
             
             // Fallback imediato
             usingLocal = true;
@@ -175,14 +189,11 @@ export const createOrder = async (orderData: Omit<Order, 'id' | 'docId'>): Promi
         return Promise.resolve(createLocalOrder(orderData));
     }
 
-    // Aumentado para 15 segundos para evitar timeout em conexões lentas ou primeira conexão
-    const timeoutPromise = new Promise<'TIMEOUT'>((resolve) => setTimeout(() => resolve('TIMEOUT'), 15000));
+    const timeoutPromise = new Promise<'TIMEOUT'>((resolve) => setTimeout(() => resolve('TIMEOUT'), 10000));
 
     try {
-        // Verificar se estamos autenticados antes de tentar escrever
         if (!auth.currentUser) {
-            console.warn("⚠️ Usuário não autenticado no Firebase. Tentando salvar localmente.");
-            throw new Error("AUTH_MISSING");
+            // Check auth silently
         }
 
         const transactionPromise = runTransaction(db, async (transaction) => {
@@ -192,7 +203,6 @@ export const createOrder = async (orderData: Omit<Order, 'id' | 'docId'>): Promi
             try {
                 counterDoc = await transaction.get(counterRef);
             } catch (err: any) {
-                // Se o documento não existe ou erro de permissão, lançamos para o catch externo
                 throw err;
             }
             
@@ -203,7 +213,6 @@ export const createOrder = async (orderData: Omit<Order, 'id' | 'docId'>): Promi
                 nextId = currentCount + 1;
                 transaction.update(counterRef, { currentId: nextId });
             } else {
-                // Cria o contador se não existir
                 transaction.set(counterRef, { currentId: nextId });
             }
             return nextId;
@@ -212,38 +221,44 @@ export const createOrder = async (orderData: Omit<Order, 'id' | 'docId'>): Promi
         const result = await Promise.race([transactionPromise, timeoutPromise]);
 
         if (result === 'TIMEOUT') {
-            console.error("❌ TIMEOUT FIREBASE: O banco de dados demorou muito para responder.");
-            console.warn("Salvando pedido LOCALMENTE para não perder a venda.");
+            console.warn("⏱️ Timeout Firebase. Salvando offline.");
             dispatchConnectionError();
             return createLocalOrder(orderData);
         }
 
         const newId = result as number;
         const fullOrder: Order = { ...orderData, id: newId };
-        const docRef = await addDoc(collection(db, ORDERS_COLLECTION), fullOrder);
         
-        console.log("✅ Pedido salvo no Firebase com sucesso! ID:", newId);
+        // --- SANITIZAÇÃO DE DADOS (CRÍTICO) ---
+        // Garante que nenhum campo 'undefined' seja enviado, evitando erro do Firestore
+        const safePayload = sanitizeData(fullOrder);
+
+        const docRef = await addDoc(collection(db, ORDERS_COLLECTION), safePayload);
+        
+        console.log("✅ Pedido salvo no Firebase! ID:", newId);
         return {
             ...fullOrder,
             docId: docRef.id
         };
 
     } catch (e: any) {
-        // ERROR HANDLING IMPROVEMENT
-        if (e.message && e.message.includes("does not exist")) {
-             console.error(`
-             🔴 ERRO CRÍTICO: BANCO DE DADOS NÃO ENCONTRADO.
-             Se já existe, limpe o cache do navegador usando o botão 'Resetar App' nas configurações.
-             `);
+        // Tratamento silencioso para UI, mas explicativo no console
+        if (isDatabaseMissingError(e)) {
+             console.log("%c Erro Firestore: Banco não encontrado/compatível. Salvando Localmente. ", "color: orange; font-weight: bold;");
+             dispatchConnectionError("Banco de dados ausente ou incompatível. Pedido salvo Localmente.");
         } else {
-             console.error("🔥 ERRO AO CRIAR PEDIDO NO FIREBASE:", e);
+             // Checagem específica de erro de validação de dados para não confundir com erro de rede
+             const msg = e.message || '';
+             if (msg.includes('Unsupported field value: undefined')) {
+                 console.error("🔥 ERRO DE DADOS CRÍTICO: Tentativa de salvar 'undefined' no Firestore.", e);
+                 // Não dispara erro de conexão, pois é um erro de código.
+                 // Ainda assim salvamos localmente para não perder a venda.
+             } else {
+                 console.warn("🔥 Erro Firebase ao criar pedido:", e.message);
+                 dispatchConnectionError();
+             }
         }
         
-        // Se erro de permissão ou não encontrado, pode ser configuração
-        // Mas se for erro de rede (offline/blocker), vamos para local
-        dispatchConnectionError(); // Notify UI
-
-        console.warn("➡️ Alternando para salvamento LOCAL (Offline) devido ao erro.");
         return Promise.resolve(createLocalOrder(orderData));
     }
 };
@@ -293,11 +308,9 @@ export const updateOrderStatus = async (orderId: number, newStatus: OrderStatus,
             
             await updateDoc(docRef, updatePayload);
         } else {
-            // Se não achou no Firebase, pode ser local
             updateLocalOrder(orderId, newStatus, cancelReason, driverName, canceledBy);
         }
     } catch (e) {
-        console.warn("Firebase Update failed. Updating LocalStorage.");
         dispatchConnectionError();
         updateLocalOrder(orderId, newStatus, cancelReason, driverName, canceledBy);
     }

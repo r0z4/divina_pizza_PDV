@@ -64,7 +64,7 @@ export interface Order {
     discount?: number; // New field for discount amount
     total: number;
     paymentMethod: PaymentMethod;
-    changeFor?: number; // Amount customer is paying with (for change calculation)
+    changeFor?: number | null; // Amount customer is paying with (for change calculation). Nullable for Firestore.
     status: OrderStatus;
     cancelReason?: string;
     type: OrderType;

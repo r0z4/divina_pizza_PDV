@@ -356,11 +356,12 @@ const App: React.FC = () => {
 
   // --- Auto Offline Trigger ---
   useEffect(() => {
-      const handleConnectionError = () => {
+      const handleConnectionError = (e: any) => {
           if (isOnlineMode) {
               console.warn("Detector de falha de conexão ativado. Mudando para Offline.");
               setIsOnlineMode(false);
-              setAlertMessage("Conexão instável com o servidor.\n\nO Sistema entrou automaticamente em MODO OFFLINE para garantir que você não perca vendas.\n\nSeus pedidos serão salvos localmente.");
+              const customMsg = e.detail?.message;
+              setAlertMessage(customMsg || "Conexão instável com o servidor.\n\nO Sistema entrou automaticamente em MODO OFFLINE para garantir que você não perca vendas.\n\nSeus pedidos serão salvos localmente.");
           }
       };
 
@@ -754,7 +755,8 @@ const App: React.FC = () => {
             discount: calculatedDiscount,
             total: cartTotal,
             paymentMethod: paymentMethod,
-            changeFor: paymentMethod === 'DINHEIRO' && changeFor ? parseFloat(changeFor) : undefined,
+            // CORREÇÃO CRÍTICA: Se não for dinheiro ou não tiver troco, enviar NULL, não undefined
+            changeFor: paymentMethod === 'DINHEIRO' && changeFor ? parseFloat(changeFor) : null,
             status: 'CONFIRMED' as OrderStatus,
             type: orderType,
             operatorName: currentUser?.name // Record who created the order
