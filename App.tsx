@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { CATEGORIES, PRODUCTS } from './constants';
 import { CartItem, Customer, Product, Order, PaymentMethod, OrderStatus, OrderType, Employee, ActiveShift, SystemUser } from './types';
@@ -58,9 +59,10 @@ import {
   Menu,
   ShieldCheck, 
   ShieldAlert,
-  NotebookPen, // New Icon for Fiado
+  NotebookPen, 
   Lock,
-  Unlock
+  Unlock,
+  RotateCcw
 } from 'lucide-react';
 
 // --- Helper Functions ---
@@ -352,6 +354,20 @@ const App: React.FC = () => {
   // --- Logo State ---
   const [logoError, setLogoError] = useState(false);
 
+  // --- Auto Offline Trigger ---
+  useEffect(() => {
+      const handleConnectionError = () => {
+          if (isOnlineMode) {
+              console.warn("Detector de falha de conexão ativado. Mudando para Offline.");
+              setIsOnlineMode(false);
+              setAlertMessage("Conexão instável com o servidor.\n\nO Sistema entrou automaticamente em MODO OFFLINE para garantir que você não perca vendas.\n\nSeus pedidos serão salvos localmente.");
+          }
+      };
+
+      window.addEventListener('firebase-connection-error', handleConnectionError);
+      return () => window.removeEventListener('firebase-connection-error', handleConnectionError);
+  }, [isOnlineMode]);
+
   // --- Handle Online Mode Toggle ---
   useEffect(() => {
       // Sync global offline state across all services
@@ -616,7 +632,7 @@ const App: React.FC = () => {
         await updateOrderStatus(orderId, newStatus, cancelReason, driverName, canceledBy);
         // State update happens automatically via the useEffect subscription
       } catch (error) {
-        setAlertMessage("Erro ao atualizar status. Verifique sua conexão.");
+        setAlertMessage("Erro ao atualizar status. O sistema pode estar offline.");
         console.error(error);
       }
   };
@@ -638,9 +654,6 @@ const App: React.FC = () => {
       // 1. Set Customer Data (Use what's in the order to ensure match)
       setCustomer({
           ...order.customer,
-          // If the order has older data, it might overwrite newer data in state, 
-          // but usually repeating an order implies using that customer.
-          // We keep orderCount from state if possible or rely on order.
       });
       setCustomerStatus('FOUND');
       setOrderType(order.type);
@@ -1163,12 +1176,12 @@ const App: React.FC = () => {
             {/* --- Sidebar Cart --- */}
             <aside className={`w-full lg:w-[350px] xl:w-[400px] bg-white dark:bg-gray-800 shadow-2xl flex flex-col h-[45vh] lg:h-full z-20 border-t lg:border-t-0 lg:border-l border-gray-300 dark:border-gray-700 relative transition-colors duration-200 ${!isStoreOpen ? 'pointer-events-none' : ''}`}>
                 {/* Header */}
-                <div className="bg-wine dark:bg-wine p-3 flex items-center justify-between shadow-md shrink-0">
+                <div className={`p-3 flex items-center justify-between shadow-md shrink-0 transition-colors ${isOnlineMode ? 'bg-wine dark:bg-wine' : 'bg-gray-600'}`}>
                   <div className="flex items-center gap-2">
                     <ShoppingCart className="w-5 h-5 text-gold" />
                     <h2 className="font-serif text-lg font-bold text-white">Pedido Atual</h2>
                   </div>
-                  <span className={`px-2 py-0.5 rounded text-xs flex items-center gap-1 font-bold ${isOnlineMode ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`}>
+                  <span className={`px-2 py-0.5 rounded text-xs flex items-center gap-1 font-bold ${isOnlineMode ? 'bg-green-600 text-white' : 'bg-orange-500 text-white animate-pulse'}`}>
                        {isProcessing ? 'Processando...' : `${isOnlineMode ? 'Online' : 'Offline'}: #${orders.length > 0 ? orders[0].id + 1 : 1001}`}
                   </span>
                 </div>
@@ -1783,6 +1796,35 @@ const App: React.FC = () => {
                                 className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-lg font-bold text-center dark:bg-gray-700 dark:text-white" 
                             />
                             <p className="text-[10px] text-gray-400 mt-1">Tempo de inatividade para logout automático.</p>
+                        </div>
+                        
+                        {/* NEW SECTION: Reset/Repair Cache */}
+                        <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                             <h4 className="text-xs font-bold text-red-500 uppercase mb-2">Zona de Perigo</h4>
+                             <button 
+                                onClick={() => {
+                                    if(window.confirm("Isso apagará todos os dados LOCAIS (Carrinho, Configurações) e tentará limpar o cache do navegador para corrigir erros de conexão. Continuar?")) {
+                                        localStorage.clear();
+                                        // Try to clear IndexedDB (Firestore Cache) safely if supported
+                                        if (window.indexedDB && window.indexedDB.databases) {
+                                            window.indexedDB.databases().then((dbs) => {
+                                                dbs.forEach((db) => {
+                                                    if (db.name && db.name.includes('firebase')) {
+                                                        const req = window.indexedDB.deleteDatabase(db.name);
+                                                        req.onsuccess = () => console.log("Deleted DB:", db.name);
+                                                        req.onerror = () => console.log("Failed to delete DB:", db.name);
+                                                    }
+                                                });
+                                            });
+                                        }
+                                        window.location.reload();
+                                    }
+                                }}
+                                className="w-full py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors"
+                             >
+                                <RotateCcw size={14}/> Resetar App & Cache
+                             </button>
+                             <p className="text-[9px] text-gray-400 mt-1 text-center">Use se o banco de dados não conectar mesmo existindo.</p>
                         </div>
                     </div>
 

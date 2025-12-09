@@ -1,5 +1,5 @@
 
-import { db } from "../firebaseConfig";
+import { db, auth } from "../firebaseConfig";
 import { 
     collection, 
     addDoc, 
@@ -33,6 +33,10 @@ const dispatchLocalUpdate = () => {
     window.dispatchEvent(new Event("local-orders-update"));
 };
 
+const dispatchConnectionError = () => {
+    window.dispatchEvent(new Event("firebase-connection-error"));
+};
+
 // --- Helper to get raw local data for CSV Export ---
 export const getLocalOrders = (): Order[] => {
     try {
@@ -47,8 +51,6 @@ export const getLocalOrders = (): Order[] => {
 export const findCustomerHistory = async (phone: string): Promise<{ customer: Customer | null, orderCount: number }> => {
     if (!phone || phone.length < 8) return { customer: null, orderCount: 0 };
 
-    // 1. Tenta buscar na base oficial de clientes (CRM) primeiro
-    // Isso garante que clientes cadastrados via painel sejam encontrados mesmo sem pedidos
     try {
         const masterCustomerRecord = await findCustomerByPhone(phone);
         if (masterCustomerRecord) {
@@ -58,17 +60,13 @@ export const findCustomerHistory = async (phone: string): Promise<{ customer: Cu
             };
         }
     } catch (e) {
-        console.warn("Falha ao buscar no CRM, tentando fallback para pedidos antigos.", e);
+        // Silent fail to allow fallback
     }
 
-    // 2. Fallback: Se não achar no CRM, busca no histórico de pedidos antigos (Legacy)
-    // Isso é útil se o cliente comprou antes do sistema de CRM existir e ainda não foi migrado
     if (forceOfflineMode) {
-        // Offline Search
         const localOrders = getLocalOrders();
         const customerOrders = localOrders.filter(o => o.customer.phone === phone);
         if (customerOrders.length > 0) {
-            // Get most recent order for details
             customerOrders.sort((a, b) => b.timestamp - a.timestamp);
             const lastOrder = customerOrders[0];
             return { 
@@ -80,7 +78,6 @@ export const findCustomerHistory = async (phone: string): Promise<{ customer: Cu
     }
 
     try {
-        // Online Search (Legacy Orders)
         const q = query(collection(db, ORDERS_COLLECTION), where("customer.phone", "==", phone), orderBy("timestamp", "desc"));
         const snapshot = await getDocs(q);
         
@@ -94,8 +91,6 @@ export const findCustomerHistory = async (phone: string): Promise<{ customer: Cu
         }
         return { customer: null, orderCount: 0 };
     } catch (e) {
-        console.warn("Error fetching customer history:", e);
-        // Fallback to local if online query fails
         const localOrders = getLocalOrders();
         const count = localOrders.filter(o => o.customer.phone === phone).length;
         return { customer: null, orderCount: count };
@@ -107,21 +102,17 @@ export const subscribeToOrders = (callback: (orders: Order[]) => void) => {
     let unsubscribeFirebase = () => {};
     let usingLocal = false;
 
-    // Local Storage Loader
     const loadFromLocal = () => {
         try {
             const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
             const orders = stored ? JSON.parse(stored) : [];
-            // Sort desc by timestamp
             orders.sort((a: Order, b: Order) => b.timestamp - a.timestamp);
             callback(orders);
         } catch (e) {
-            console.error("Error loading orders from local storage", e);
             callback([]);
         }
     };
 
-    // If explicitly offline, skip firebase entirely
     if (forceOfflineMode) {
         loadFromLocal();
         window.addEventListener("local-orders-update", loadFromLocal);
@@ -131,7 +122,6 @@ export const subscribeToOrders = (callback: (orders: Order[]) => void) => {
     }
 
     try {
-        // Try Firebase
         const q = query(collection(db, ORDERS_COLLECTION), orderBy("timestamp", "desc"), limit(500));
         
         unsubscribeFirebase = onSnapshot(q, (snapshot) => {
@@ -141,13 +131,31 @@ export const subscribeToOrders = (callback: (orders: Order[]) => void) => {
             })) as Order[];
             callback(ordersData);
         }, (error) => {
-            console.warn("Firebase unavailable (Snapshot Error), switching to LocalStorage:", error);
+            // Check specific database missing error
+            if (error.message.includes("database") && error.message.includes("does not exist")) {
+                 console.error(`
+                 🚨 ERRO DE CONEXÃO COM BANCO DE DADOS:
+                 O Firebase retornou que o banco de dados '(default)' não foi encontrado.
+                 
+                 SE VOCÊ TEM CERTEZA QUE CRIOU O BANCO NO CONSOLE:
+                 1. O navegador pode estar com cache antigo. Vá em Configurações > Resetar App & Cache.
+                 2. Verifique se o ID do projeto 'pizza-divina-pdv' está correto.
+                 3. Verifique se o banco foi criado na localização correta.
+                 `);
+            } else {
+                console.error("🔥 ERRO DE CONEXÃO FIREBASE (Subscribe):", error);
+            }
+            
+            console.warn("Alternando para Modo Offline automaticamente.");
+            
+            dispatchConnectionError(); // Notify App to switch UI state
+            
+            // Fallback imediato
             usingLocal = true;
             loadFromLocal();
             window.addEventListener("local-orders-update", loadFromLocal);
         });
     } catch (e) {
-        console.warn("Firebase init failed, using LocalStorage immediately.");
         usingLocal = true;
         loadFromLocal();
         window.addEventListener("local-orders-update", loadFromLocal);
@@ -163,65 +171,87 @@ export const subscribeToOrders = (callback: (orders: Order[]) => void) => {
 
 // --- Create Order with Atomic ID Increment ---
 export const createOrder = async (orderData: Omit<Order, 'id' | 'docId'>): Promise<Order> => {
-    // Check global flag first
     if (forceOfflineMode) {
         return Promise.resolve(createLocalOrder(orderData));
     }
 
-    // Safety Timeout Promise
-    const timeoutPromise = new Promise<'TIMEOUT'>((resolve) => setTimeout(() => resolve('TIMEOUT'), 3000));
+    // Aumentado para 15 segundos para evitar timeout em conexões lentas ou primeira conexão
+    const timeoutPromise = new Promise<'TIMEOUT'>((resolve) => setTimeout(() => resolve('TIMEOUT'), 15000));
 
     try {
-        // Race between Firebase Transaction and a 3-second timeout
+        // Verificar se estamos autenticados antes de tentar escrever
+        if (!auth.currentUser) {
+            console.warn("⚠️ Usuário não autenticado no Firebase. Tentando salvar localmente.");
+            throw new Error("AUTH_MISSING");
+        }
+
         const transactionPromise = runTransaction(db, async (transaction) => {
             const counterRef = doc(db, COUNTERS_COLLECTION, ORDER_COUNTER_DOC);
-            const counterDoc = await transaction.get(counterRef);
             
-            let nextId = 1001; // Default starting ID
+            let counterDoc;
+            try {
+                counterDoc = await transaction.get(counterRef);
+            } catch (err: any) {
+                // Se o documento não existe ou erro de permissão, lançamos para o catch externo
+                throw err;
+            }
+            
+            let nextId = 1001; 
             
             if (counterDoc.exists()) {
                 const currentCount = counterDoc.data().currentId;
                 nextId = currentCount + 1;
                 transaction.update(counterRef, { currentId: nextId });
             } else {
+                // Cria o contador se não existir
                 transaction.set(counterRef, { currentId: nextId });
             }
             return nextId;
         });
 
-        // Run the race
         const result = await Promise.race([transactionPromise, timeoutPromise]);
 
         if (result === 'TIMEOUT') {
-            console.warn("Firebase Transaction Timed Out. Saving locally to prevent blocking.");
+            console.error("❌ TIMEOUT FIREBASE: O banco de dados demorou muito para responder.");
+            console.warn("Salvando pedido LOCALMENTE para não perder a venda.");
+            dispatchConnectionError();
             return createLocalOrder(orderData);
         }
 
-        // Proceed if transaction succeeded
         const newId = result as number;
         const fullOrder: Order = { ...orderData, id: newId };
-
-        // Save order document (async, non-transactional part)
-        // If this also hangs, we are already committed with an ID, but let's just await it.
         const docRef = await addDoc(collection(db, ORDERS_COLLECTION), fullOrder);
         
+        console.log("✅ Pedido salvo no Firebase com sucesso! ID:", newId);
         return {
             ...fullOrder,
             docId: docRef.id
         };
 
-    } catch (e) {
-        console.warn("Firebase Transaction failed. Saving to LocalStorage.", e);
+    } catch (e: any) {
+        // ERROR HANDLING IMPROVEMENT
+        if (e.message && e.message.includes("does not exist")) {
+             console.error(`
+             🔴 ERRO CRÍTICO: BANCO DE DADOS NÃO ENCONTRADO.
+             Se já existe, limpe o cache do navegador usando o botão 'Resetar App' nas configurações.
+             `);
+        } else {
+             console.error("🔥 ERRO AO CRIAR PEDIDO NO FIREBASE:", e);
+        }
+        
+        // Se erro de permissão ou não encontrado, pode ser configuração
+        // Mas se for erro de rede (offline/blocker), vamos para local
+        dispatchConnectionError(); // Notify UI
+
+        console.warn("➡️ Alternando para salvamento LOCAL (Offline) devido ao erro.");
         return Promise.resolve(createLocalOrder(orderData));
     }
 };
 
-// Helper for local creation
 const createLocalOrder = (orderData: Omit<Order, 'id' | 'docId'>): Order => {
     const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
     const orders: Order[] = stored ? JSON.parse(stored) : [];
     
-    // Generate ID based on max existing ID locally
     const maxId = orders.length > 0 ? Math.max(...orders.map(o => o.id)) : 1000;
     const newId = maxId + 1;
 
@@ -231,7 +261,7 @@ const createLocalOrder = (orderData: Omit<Order, 'id' | 'docId'>): Order => {
         docId: `local_${Date.now()}`
     };
 
-    orders.unshift(fullOrder); // Add to beginning
+    orders.unshift(fullOrder);
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(orders));
     dispatchLocalUpdate();
 
@@ -256,7 +286,6 @@ export const updateOrderStatus = async (orderId: number, newStatus: OrderStatus,
             if (cancelReason) updatePayload.cancelReason = cancelReason;
             if (driverName) updatePayload.driverName = driverName;
             
-            // Add cancellation metadata
             if (newStatus === 'CANCELED' && canceledBy) {
                 updatePayload.canceledBy = canceledBy;
                 updatePayload.canceledAt = Date.now();
@@ -264,11 +293,12 @@ export const updateOrderStatus = async (orderId: number, newStatus: OrderStatus,
             
             await updateDoc(docRef, updatePayload);
         } else {
-            // If not found in firebase, try updating local anyway (maybe it was a local order)
+            // Se não achou no Firebase, pode ser local
             updateLocalOrder(orderId, newStatus, cancelReason, driverName, canceledBy);
         }
     } catch (e) {
-        console.warn("Firebase Update failed. Updating LocalStorage.", e);
+        console.warn("Firebase Update failed. Updating LocalStorage.");
+        dispatchConnectionError();
         updateLocalOrder(orderId, newStatus, cancelReason, driverName, canceledBy);
     }
 };
