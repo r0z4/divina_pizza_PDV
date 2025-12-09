@@ -1,3 +1,4 @@
+
 import { initializeApp } from "firebase/app";
 import { initializeFirestore, persistentLocalCache } from "firebase/firestore";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
@@ -18,12 +19,12 @@ const app = initializeApp(firebaseConfig);
 
 // --- CONFIGURAÇÃO AVANÇADA DO FIRESTORE ---
 // Inicializa o Firestore com persistência local (Offline)
+// CORREÇÃO: databaseId é o terceiro argumento da função
 export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({
     tabManager: undefined
-    // Removido CACHE_SIZE_UNLIMITED para evitar erros de cota (QuotaExceededError) em alguns navegadores/dispositivos
-  }),
-});
+  })
+}, "pizza-divina-pdv1"); 
 
 // --- AUTENTICAÇÃO ANÔNIMA ---
 export const auth = getAuth(app);
